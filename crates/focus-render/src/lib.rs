@@ -1,12 +1,14 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use focus_core::{Focus, Phase, Preset, Timer};
+use focus_core::{Focus, Phase, Preset, Session, Timer, MAX_SUBJECT};
 use primitive_app::{App, Change};
 use primitive_ui::{
-    back_button, header, progress, screen_rect, Canvas, Input, Rect, TextStyle, BODY, CAPTION,
+    back_button, header, keyboard_key, progress, screen_rect, Canvas, Editor, Input, Layout, Press,
+    Rect, TextStyle, BODY, CAPTION,
 };
 
 const DAY: i64 = 86_400;
@@ -16,6 +18,16 @@ const PRESETS: [(Preset, &str); 3] = [
     (Preset::Custom, "Custom"),
 ];
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Page {
+    Timer,
+    Subjects,
+    SubjectEditor,
+    Week,
+}
+
+const LOG_ROWS: usize = 7;
+
 pub struct View {
     pub focus: Focus,
     data: Option<PathBuf>,
@@ -24,6 +36,10 @@ pub struct View {
     preview: bool,
     confirm_reset: bool,
     notice: Option<String>,
+    page: Page,
+    subject_editor: Editor,
+    log_page: usize,
+    show_sessions: bool,
 }
 
 impl View {
@@ -50,6 +66,10 @@ impl View {
             preview,
             confirm_reset: false,
             notice: None,
+            page: Page::Timer,
+            subject_editor: Editor::new(MAX_SUBJECT),
+            log_page: 0,
+            show_sessions: false,
         };
         if completed {
             view.persist();
@@ -64,6 +84,9 @@ impl View {
         let completed = self.focus.advance(now);
         if completed {
             self.persist();
+        }
+        if self.day(now) != day {
+            self.log_page = 0;
         }
         completed || self.day(now) != day || self.focus.remaining(now).div_ceil(60) != minutes
     }
@@ -106,7 +129,12 @@ impl View {
             Phase::Focus => "Focus session",
             Phase::Break => "Break",
         };
-        canvas.text(rect(width, 72, 234, 1120, 54), phase, BODY.center());
+        let heading = if self.focus.phase == Phase::Focus && !self.focus.subject().is_empty() {
+            format!("{phase} · {}", self.focus.subject())
+        } else {
+            phase.to_owned()
+        };
+        canvas.text(rect(width, 72, 234, 1120, 54), &heading, BODY.center());
         let remaining = self.focus.remaining(self.now);
         let caption;
         let timer = match (self.focus.timer, self.focus.phase) {
@@ -179,8 +207,224 @@ impl View {
         }
     }
 
+    fn recent_subjects(&self) -> Vec<&str> {
+        let mut subjects = Vec::new();
+        for session in self.focus.sessions().iter().rev() {
+            let subject = session.subject.as_str();
+            if !subject.is_empty() && !subjects.contains(&subject) {
+                subjects.push(subject);
+                if subjects.len() == 5 {
+                    break;
+                }
+            }
+        }
+        subjects
+    }
+
+    fn this_week(&self) -> impl Iterator<Item = &Session> {
+        let today = self.day(self.now);
+        let monday = today - (today + 3).rem_euclid(7);
+        self.focus
+            .sessions()
+            .iter()
+            .rev()
+            .filter(move |session| (monday..=today).contains(&self.day(session.finished)))
+    }
+
+    fn subject_totals(&self) -> Vec<(&str, u32)> {
+        let mut totals = BTreeMap::<&str, u32>::new();
+        for session in self.this_week() {
+            *totals.entry(labelled(&session.subject)).or_default() += session.seconds;
+        }
+        let mut totals = totals.into_iter().collect::<Vec<_>>();
+        totals.sort_by(|left, right| right.1.cmp(&left.1).then(left.0.cmp(right.0)));
+        totals
+    }
+
+    fn draw_log(&self, canvas: &mut Canvas, width: i32) {
+        header(canvas, "This week", "Back");
+        let sessions = self.this_week().collect::<Vec<_>>();
+        let minutes = sessions.iter().map(|session| session.seconds).sum::<u32>() / 60;
+        let count = sessions.len();
+        let noun = if count == 1 { "session" } else { "sessions" };
+        canvas.text(
+            rect(width, 40, 162, 1184, 62),
+            &format!("{count} focus {noun}  ·  {minutes} min"),
+            BODY,
+        );
+        canvas.button(
+            rect(width, 40, 255, 568, 100),
+            "Subjects",
+            !self.show_sessions,
+            false,
+        );
+        canvas.button(
+            rect(width, 656, 255, 568, 100),
+            "Sessions",
+            self.show_sessions,
+            false,
+        );
+        let skip = self.log_page * LOG_ROWS;
+        let len = if self.show_sessions {
+            for (row, session) in sessions.iter().skip(skip).take(LOG_ROWS).enumerate() {
+                let local = session
+                    .finished
+                    .saturating_add(self.offset(session.finished));
+                let weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+                let weekday = weekdays[((self.day(session.finished) + 3).rem_euclid(7)) as usize];
+                let hour = local.rem_euclid(DAY) / 3600;
+                let minute = local.rem_euclid(3600) / 60;
+                log_row(
+                    canvas,
+                    width,
+                    row,
+                    labelled(&session.subject),
+                    &format!(
+                        "{weekday} {hour:02}:{minute:02}  ·  {} min",
+                        session.seconds / 60
+                    ),
+                );
+            }
+            count
+        } else {
+            let totals = self.subject_totals();
+            for (row, &(subject, time)) in totals.iter().skip(skip).take(LOG_ROWS).enumerate() {
+                log_row(canvas, width, row, subject, &format!("{} min", time / 60));
+            }
+            totals.len()
+        };
+        if count == 0 {
+            canvas.text(
+                rect(width, 40, 420, 1184, 90),
+                "No finished sessions this week.",
+                BODY.center(),
+            );
+        }
+        if self.log_page > 0 {
+            canvas.button(rect(width, 40, 1480, 400, 100), "Previous", false, false);
+        }
+        if (self.log_page + 1) * LOG_ROWS < len {
+            canvas.button(rect(width, 824, 1480, 400, 100), "Next", false, false);
+        }
+    }
+
+    fn draw_subjects(&self, canvas: &mut Canvas, width: i32) {
+        header(canvas, "Subject", "Back");
+        canvas.text(
+            rect(width, 40, 165, 1184, 70),
+            "Give your next focus session a label.",
+            CAPTION,
+        );
+        canvas.button(rect(width, 40, 270, 568, 100), "No subject", false, false);
+        canvas.button(rect(width, 656, 270, 568, 100), "New subject", true, false);
+        for (index, subject) in self.recent_subjects().into_iter().enumerate() {
+            canvas.button(
+                subject_row(width, index),
+                subject,
+                subject == self.focus.subject(),
+                false,
+            );
+        }
+    }
+
+    fn draw_subject_editor(&self, canvas: &mut Canvas, width: i32) {
+        header(canvas, "New subject", "Cancel");
+        canvas.card(rect(width, 40, 200, 1184, 200));
+        canvas.text(rect(width, 70, 233, 1110, 65), "Subject name", CAPTION);
+        let display = self.subject_editor.string();
+        canvas.text(rect(width, 70, 305, 1110, 65), &display, BODY);
+        canvas.keyboard(self.subject_editor.layer, "Save", None);
+    }
+
+    fn use_subject(&mut self, subject: &str) -> Change {
+        self.focus.choose_subject(subject);
+        self.page = Page::Timer;
+        self.persist();
+        Change::Full
+    }
+
+    fn log_page(&mut self, amount: isize) -> Change {
+        let count = if self.show_sessions {
+            self.this_week().count()
+        } else {
+            self.subject_totals().len()
+        };
+        let next = self
+            .log_page
+            .saturating_add_signed(amount)
+            .min(count.div_ceil(LOG_ROWS).saturating_sub(1));
+        if next == self.log_page {
+            return Change::None;
+        }
+        self.log_page = next;
+        Change::Partial
+    }
+
+    fn secondary_tap(&mut self, x: f32, y: f32) -> Change {
+        let width = primitive_app::WIDTH as i32;
+        if back_button(width).contains(x, y) {
+            self.page = if self.page == Page::SubjectEditor {
+                Page::Subjects
+            } else {
+                Page::Timer
+            };
+            return Change::Full;
+        }
+        match self.page {
+            Page::Subjects => {
+                if rect(width, 40, 270, 568, 100).contains(x, y) {
+                    return self.use_subject("");
+                }
+                if rect(width, 656, 270, 568, 100).contains(x, y) {
+                    self.subject_editor = Editor::new(MAX_SUBJECT);
+                    self.page = Page::SubjectEditor;
+                    return Change::Full;
+                }
+                let selected = self
+                    .recent_subjects()
+                    .into_iter()
+                    .enumerate()
+                    .find(|(index, _)| subject_row(width, *index).contains(x, y))
+                    .map(|(_, value)| value.to_owned());
+                if let Some(subject) = selected {
+                    return self.use_subject(&subject);
+                }
+            }
+            Page::SubjectEditor => {
+                let layout = Layout::new(1264, 1680, 4, 5);
+                if let Some(key) = keyboard_key(&layout, &self.subject_editor, "Save", x, y) {
+                    return match self.subject_editor.press(key) {
+                        Press::Nothing => Change::None,
+                        Press::Go => self.use_subject(&self.subject_editor.string()),
+                        _ => Change::Partial,
+                    };
+                }
+            }
+            Page::Week => {
+                let subjects = rect(width, 40, 255, 568, 100).contains(x, y);
+                let sessions = rect(width, 656, 255, 568, 100).contains(x, y);
+                if subjects && self.show_sessions || sessions && !self.show_sessions {
+                    self.show_sessions = sessions;
+                    self.log_page = 0;
+                    return Change::Partial;
+                }
+                if rect(width, 40, 1480, 400, 100).contains(x, y) {
+                    return self.log_page(-1);
+                }
+                if rect(width, 824, 1480, 400, 100).contains(x, y) {
+                    return self.log_page(1);
+                }
+            }
+            Page::Timer => {}
+        }
+        Change::None
+    }
+
     fn tap(&mut self, x: f32, y: f32) -> Change {
         let width = primitive_app::WIDTH as i32;
+        if self.page != Page::Timer {
+            return self.secondary_tap(x, y);
+        }
         if self.confirm_reset {
             self.confirm_reset = false;
             if reset_confirm_button(width).contains(x, y) {
@@ -191,6 +435,16 @@ impl View {
         }
         if back_button(width).contains(x, y) {
             return Change::Exit;
+        }
+        if week_button(width).contains(x, y) {
+            self.page = Page::Week;
+            self.log_page = 0;
+            self.show_sessions = false;
+            return Change::Full;
+        }
+        if self.focus.can_choose_subject() && subject_button(width).contains(x, y) {
+            self.page = Page::Subjects;
+            return Change::Full;
         }
         if primary_button(width, self.focus.timer).contains(x, y) {
             self.focus.primary(self.now);
@@ -235,6 +489,12 @@ impl View {
 impl App for View {
     fn draw(&self, canvas: &mut Canvas) {
         let width = canvas.bounds().w;
+        match self.page {
+            Page::Subjects => return self.draw_subjects(canvas, width),
+            Page::SubjectEditor => return self.draw_subject_editor(canvas, width),
+            Page::Week => return self.draw_log(canvas, width),
+            Page::Timer => {}
+        }
         header(canvas, "Focus", "Done");
         self.draw_timer(canvas, width);
         canvas.button(
@@ -249,13 +509,23 @@ impl App for View {
             self.draw_settings(canvas, width);
         }
 
+        if self.focus.can_choose_subject() {
+            let subject = self.focus.subject();
+            let label = if subject.is_empty() {
+                "Set subject".to_owned()
+            } else {
+                format!("Subject · {subject}")
+            };
+            canvas.button(subject_button(width), &label, false, false);
+        }
         let today = self.day(self.now);
         let (count, total) = self.focus.totals(|when| self.day(when) == today);
-        canvas.card(rect(width, 40, 1300, 1184, 223));
-        canvas.text(rect(width, 76, 1340, 1080, 52), "Today", CAPTION);
+        canvas.card(rect(width, 40, 1370, 1184, 194));
+        canvas.text(rect(width, 76, 1400, 740, 52), "Today", CAPTION);
         let sessions = if count == 1 { "session" } else { "sessions" };
         let totals = format!("{count} focus {sessions}  ·  {} min", total / 60);
-        canvas.text(rect(width, 76, 1400, 1080, 65), &totals, BODY);
+        canvas.text(rect(width, 76, 1460, 760, 65), &totals, BODY);
+        canvas.button(week_button(width), "This week", false, false);
         if let Some(notice) = &self.notice {
             canvas.text(rect(width, 40, 1560, 1184, 60), notice, CAPTION.center());
         }
@@ -279,7 +549,8 @@ impl App for View {
     fn input(&mut self, input: Input) -> Change {
         let prior = self.focus.timer;
         let clock_changed = !self.preview && self.at(wall_now());
-        if matches!(prior, Timer::Running { .. })
+        if self.page == Page::Timer
+            && matches!(prior, Timer::Running { .. })
             && self.focus.timer == Timer::Finished
             && matches!(input, Input::Tap(_, _))
         {
@@ -294,6 +565,15 @@ impl App for View {
                 self.confirm_reset = false;
                 Change::Full
             }
+            Input::PageBack if self.page != Page::Timer => {
+                self.page = if self.page == Page::SubjectEditor {
+                    Page::Subjects
+                } else {
+                    Page::Timer
+                };
+                Change::Full
+            }
+            Input::PageForward if self.page == Page::Week => self.log_page(1),
             Input::PageBack => Change::Exit,
             _ => {
                 if clock_changed {
@@ -323,12 +603,46 @@ impl App for View {
         }
     }
 
+    fn storage_returned(&mut self) -> io::Result<()> {
+        if !self.preview {
+            self.at(wall_now());
+        }
+        self.save()
+    }
+
     fn save(&mut self) -> io::Result<()> {
         if let Some(path) = &self.data {
             primitive_app::save(path, &serde_json::to_vec(&self.focus)?)?;
         }
         Ok(())
     }
+}
+
+fn labelled(subject: &str) -> &str {
+    if subject.is_empty() {
+        "No subject"
+    } else {
+        subject
+    }
+}
+
+fn log_row(canvas: &mut Canvas, width: i32, index: usize, label: &str, detail: &str) {
+    let y = 390 + index as i32 * 146;
+    canvas.card(rect(width, 40, y, 1184, 123));
+    canvas.text(rect(width, 72, y + 14, 1120, 46), label, BODY);
+    canvas.text(rect(width, 72, y + 65, 1120, 36), detail, CAPTION);
+}
+
+fn subject_row(width: i32, index: usize) -> Rect {
+    rect(width, 40, 410 + index as i32 * 126, 1184, 104)
+}
+
+fn subject_button(width: i32) -> Rect {
+    rect(width, 40, 1250, 1184, 100)
+}
+
+fn week_button(width: i32) -> Rect {
+    rect(width, 854, 1420, 334, 100)
 }
 
 fn wall_now() -> i64 {
@@ -367,6 +681,26 @@ fn preset_button(width: i32, index: usize) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_sessions_remain_visible_and_week_totals_use_local_monday() {
+        let saved = r#"{"preset":"Classic","phase":"Focus","timer":"Ready","custom_focus":25,"custom_break":5,"completions":[[200,1500]]}"#;
+        let focus = serde_json::from_str::<Focus>(saved).unwrap().restored();
+        let mut app = View::new(focus, None, DAY * 4, true);
+        app.zone.clear();
+        assert_eq!(app.focus.totals(|_| true), (1, 1500));
+        assert_eq!(app.focus.sessions()[0].subject, "");
+        assert!(app.subject_totals().is_empty());
+        app.focus.choose_subject("Reading");
+        app.focus.primary(app.now);
+        app.focus
+            .choose_subject("Attempt to rename a running session");
+        app.at(app.now + 1500);
+        assert_eq!(app.subject_totals(), vec![("Reading", 1500)]);
+        assert_eq!(app.focus.sessions().last().unwrap().subject, "Reading");
+        app.at(DAY * 11);
+        assert!(app.subject_totals().is_empty());
+    }
 
     #[test]
     fn a_timer_that_expired_offscreen_is_recorded_only_once() -> io::Result<()> {

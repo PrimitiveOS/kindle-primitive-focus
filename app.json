@@ -3,14 +3,14 @@
   "id": "primitive-focus",
   "dir": "focus",
   "name": "Focus",
-  "subtitle": "Focus and break timers",
+  "subtitle": "Focus timers and a study log",
   "developer": {
     "name": "Primitive AI"
   },
   "categories": [
     "productivity"
   ],
-  "description": "Use 25/5 and 50/10 presets or set your own focus and break lengths. Pause, resume or reset the countdown and see how many focus sessions you completed today.",
+  "description": "Choose a 25/5 or 50/10 focus and break preset or set your own timer. Label sessions by subject, then see weekly time and recent sessions in the study log.",
   "repo": "https://github.com/DoanNguyenTrong/kindle-primitive-focus",
   "licence": "PolyForm-Noncommercial-1.0.0",
   "source": "hosted",

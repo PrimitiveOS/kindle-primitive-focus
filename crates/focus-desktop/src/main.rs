@@ -32,6 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         HEIGHT,
         &frame(&app, &mut canvas, false),
     )?;
+    app.focus.choose_subject("Reading");
     assert_eq!(app.input(Input::Tap(450.0, 680.0)), Change::Partial);
     app.at(10_061);
     assert_eq!(app.focus.remaining(10_061), 1439);
@@ -50,6 +51,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         HEIGHT,
         &frame(&app, &mut canvas, false),
     )?;
+    assert_eq!(app.input(Input::Tap(1000.0, 1470.0)), Change::Full);
+    write_png(
+        &output.join("focus-study-log.png"),
+        WIDTH,
+        HEIGHT,
+        &frame(&app, &mut canvas, false),
+    )?;
+    assert_eq!(app.input(Input::Tap(950.0, 300.0)), Change::Partial);
+    write_png(
+        &output.join("focus-sessions-dark.png"),
+        WIDTH,
+        HEIGHT,
+        &frame(&app, &mut canvas, true),
+    )?;
+    assert_eq!(app.input(Input::PageBack), Change::Full);
     assert_eq!(app.input(Input::Tap(450.0, 680.0)), Change::Partial);
     assert_eq!(app.focus.phase, Phase::Break);
     Ok(())

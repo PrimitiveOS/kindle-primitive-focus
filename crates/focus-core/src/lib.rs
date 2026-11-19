@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub const MAX_MINUTES: u16 = 180;
+pub const MAX_SUBJECT: usize = 48;
 const MAX_SECONDS: u32 = MAX_MINUTES as u32 * 60;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -34,13 +35,56 @@ pub enum Timer {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(from = "SavedSession")]
+pub struct Session {
+    pub finished: i64,
+    pub seconds: u32,
+    pub subject: String,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum SavedSession {
+    Labelled {
+        finished: i64,
+        seconds: u32,
+        #[serde(default)]
+        subject: String,
+    },
+    Previous((i64, u32)),
+}
+
+impl From<SavedSession> for Session {
+    fn from(saved: SavedSession) -> Self {
+        match saved {
+            SavedSession::Labelled {
+                finished,
+                seconds,
+                subject,
+            } => Self {
+                finished,
+                seconds,
+                subject,
+            },
+            SavedSession::Previous((finished, seconds)) => Self {
+                finished,
+                seconds,
+                subject: String::new(),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Focus {
     pub preset: Preset,
     pub phase: Phase,
     pub timer: Timer,
     custom_focus: u16,
     custom_break: u16,
-    completions: Vec<(i64, u32)>,
+    completions: Vec<Session>,
+    #[serde(default)]
+    subject: String,
 }
 
 impl Default for Focus {
@@ -52,6 +96,7 @@ impl Default for Focus {
             custom_focus: 25,
             custom_break: 5,
             completions: Vec::new(),
+            subject: String::new(),
         }
     }
 }
@@ -71,11 +116,34 @@ impl Focus {
         if !valid {
             self.reset();
         }
-        self.completions.retain(|(_, length)| valid_length(*length));
+        self.subject = subject_text(&self.subject);
+        self.completions
+            .retain(|session| valid_length(session.seconds));
+        for session in &mut self.completions {
+            session.subject = subject_text(&session.subject);
+        }
         if self.completions.len() > 512 {
             self.completions.drain(..self.completions.len() - 512);
         }
         self
+    }
+
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+
+    pub fn can_choose_subject(&self) -> bool {
+        self.timer == Timer::Ready || (self.timer == Timer::Finished && self.phase == Phase::Break)
+    }
+
+    pub fn choose_subject(&mut self, subject: &str) {
+        if self.can_choose_subject() {
+            self.subject = subject_text(subject);
+        }
+    }
+
+    pub fn sessions(&self) -> &[Session] {
+        &self.completions
     }
 
     pub fn custom(&self, phase: Phase) -> u16 {
@@ -133,7 +201,11 @@ impl Focus {
             return false;
         }
         if self.phase == Phase::Focus {
-            self.completions.push((deadline, length));
+            self.completions.push(Session {
+                finished: deadline,
+                seconds: length,
+                subject: self.subject.clone(),
+            });
             if self.completions.len() > 512 {
                 self.completions.remove(0);
             }
@@ -162,9 +234,9 @@ impl Focus {
     pub fn totals(&self, mut is_today: impl FnMut(i64) -> bool) -> (usize, u32) {
         self.completions
             .iter()
-            .filter(|(when, _)| is_today(*when))
-            .fold((0, 0_u32), |(count, seconds), (_, length)| {
-                (count + 1, seconds.saturating_add(*length))
+            .filter(|session| is_today(session.finished))
+            .fold((0, 0_u32), |(count, seconds), session| {
+                (count + 1, seconds.saturating_add(session.seconds))
             })
     }
 
@@ -185,6 +257,14 @@ impl Focus {
             length,
         }
     }
+}
+
+fn subject_text(text: &str) -> String {
+    text.trim()
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(MAX_SUBJECT)
+        .collect()
 }
 
 fn seconds_until(deadline: i64, now: i64, limit: u32) -> u32 {

@@ -10,8 +10,8 @@
 
 ---
 
-Pick a focus session and a break, then check the day's completed sessions and focus time. The countdown changes at
-minute boundaries to limit e-ink refreshes.
+Pick a focus session and a break. Add an optional subject and open **This week** to see your study log. The countdown
+changes at minute boundaries to limit e-ink refreshes.
 
 ## Screenshots
 
@@ -21,6 +21,10 @@ minute boundaries to limit e-ink refreshes.
     <td align="center"><img src="docs/images/focus-running-dark.png" alt="Running focus countdown with Pause and Reset in dark mode" width="260"><br><sub>A running timer in dark mode</sub></td>
     <td align="center"><img src="docs/images/focus-complete.png" alt="Focus complete with Start break and a recorded 25-minute session" width="260"><br><sub>Session complete</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/images/focus-study-log.png" alt="Study log showing focus time grouped by subject" width="260"></td>
+    <td align="center"><img src="docs/images/focus-sessions-dark.png" alt="Recent focus sessions in dark mode" width="260"></td>
+  </tr>
 </table>
 
 <sub>Desktop simulation at 1264 × 1680 with sample timers.</sub>
@@ -28,7 +32,8 @@ minute boundaries to limit e-ink refreshes.
 ## Highlights
 
 - Use the 25/5 or 50/10 minute presets, or set separate focus and break lengths.
-- Start, pause, and reset the timer. Completed sessions count toward today's total.
+- Start, pause, and reset the timer. Choose **Set subject** before starting focus and reuse recent subject labels.
+- Open **This week** for Monday-to-Sunday totals by subject or a list of completed sessions. Breaks stay out of the study log.
 - Session state is saved on sleep and exit. The Kindle driver refreshes the idle timer during a running session.
 
 ## Quick start
@@ -38,8 +43,8 @@ tap **Get**, and open it from the Launcher grid. The [install guide](INSTALL.md)
 
 ## Status
 
-Desktop simulation and local ARMHF package checks passed on the Mac.
-On an ARMHF Kindle Oasis 3 running firmware 5.18.2, Focus displayed the custom timer controls, restored the
+Version 0.1.1 passed desktop simulation and local ARMHF package checks on the Mac.
+Version 0.1.0 was checked on an ARMHF Kindle Oasis 3 running firmware 5.18.2. Focus displayed the custom timer controls, restored the
 original idle preset, and returned to Launcher. Battery-powered idle, sleep and wake, and rotation checks are
 pending. [Device notes](docs/device-notes.md)
 

@@ -1,5 +1,10 @@
 # Changes
 
+## 0.1.1
+
+- Label focus sessions and reuse recent subjects.
+- See weekly totals by subject and recent sessions in This week.
+
 ## 0.1.0
 
 - Use 25/5 and 50/10 presets or set your own focus and break lengths. Pause, resume or reset the countdown and see how many focus sessions you completed today.

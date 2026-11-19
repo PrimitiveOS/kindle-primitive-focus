@@ -228,14 +228,14 @@ dependencies = [
 
 [[package]]
 name = "focus-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "focus-desktop"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "focus-core",
  "focus-render",
@@ -245,7 +245,7 @@ dependencies = [
 
 [[package]]
 name = "focus-kindle"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "focus-core",
  "focus-render",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "focus-render"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "focus-core",
  "kl-core",

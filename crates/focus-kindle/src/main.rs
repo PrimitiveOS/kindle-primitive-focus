@@ -88,6 +88,10 @@ impl App for KindleFocus {
         change
     }
 
+    fn storage_returned(&mut self) -> io::Result<()> {
+        self.view.storage_returned()
+    }
+
     fn save(&mut self) -> io::Result<()> {
         self.view.save()
     }
