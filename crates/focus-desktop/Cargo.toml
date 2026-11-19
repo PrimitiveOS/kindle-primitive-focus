@@ -1,0 +1,11 @@
+[package]
+name = "focus-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+focus-core.workspace = true
+focus-render.workspace = true
+primitive-app.workspace = true
+primitive-ui.workspace = true

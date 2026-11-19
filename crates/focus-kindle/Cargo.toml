@@ -1,0 +1,10 @@
+[package]
+name = "focus-kindle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+focus-core.workspace = true
+focus-render.workspace = true
+primitive-app.workspace = true

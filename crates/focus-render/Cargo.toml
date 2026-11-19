@@ -1,0 +1,12 @@
+[package]
+name = "focus-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+focus-core.workspace = true
+primitive-app.workspace = true
+primitive-ui.workspace = true
+serde_json = "1"
+kl-core = { path = "../../../doannt-kindle-tools/crates/kl-core" }

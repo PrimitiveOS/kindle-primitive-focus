@@ -1,0 +1,16 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  release:
+    permissions:
+      contents: write
+    # Pin to @v1 once that version exists.
+    uses: DoanNguyenTrong/kindle-primitive-build/.github/workflows/package.yml@main
+    with:
+      id: primitive-focus
+      dir: focus
+      binary-crate: focus-kindle
+      docs-licence-file: LICENSE-DOCS
+      sibling-tools-ref: main
