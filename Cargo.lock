@@ -227,7 +227,9 @@ version = "0.1.0"
 dependencies = [
  "focus-core",
  "focus-render",
+ "kl-kindle",
  "primitive-app",
+ "primitive-ui",
 ]
 
 [[package]]

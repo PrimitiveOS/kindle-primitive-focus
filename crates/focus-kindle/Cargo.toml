@@ -8,3 +8,5 @@ license.workspace = true
 focus-core.workspace = true
 focus-render.workspace = true
 primitive-app.workspace = true
+primitive-ui.workspace = true
+kl-kindle = { path = "../../../doannt-kindle-tools/crates/kl-kindle" }
