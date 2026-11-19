@@ -1,6 +1,6 @@
 <div align="center">
 
-# Primitive Focus
+# Focus
 
 **A focus and break timer for Kindle e-readers.**
 
@@ -34,7 +34,7 @@ minute boundaries to limit e-ink refreshes.
 ## Quick start
 
 Copy the `focus` and `documents` folders from the local ARMHF package to your Kindle over USB, then eject and open
-**Primitive Focus** from Primitive Launcher. The app uses the fonts installed by Launcher. [Install guide](INSTALL.md)
+**Focus** from Primitive Launcher. The app uses the fonts installed by Launcher. [Install guide](INSTALL.md)
 
 ## Status
 

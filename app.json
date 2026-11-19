@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "primitive-focus",
   "dir": "focus",
-  "name": "Primitive Focus",
+  "name": "Focus",
   "subtitle": "Focus and break timers",
   "developer": {
     "name": "Primitive AI"

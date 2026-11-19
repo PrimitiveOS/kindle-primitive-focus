@@ -1,5 +1,5 @@
 #!/bin/sh
-# Name: Primitive Focus
+# Name: Focus
 # Author: Primitive AI
 # DontUseFBInk
 # PrimitiveUSBLease
