@@ -38,8 +38,10 @@ Copy the `focus` and `documents` folders from the local ARMHF package to your Ki
 
 ## Status
 
-Desktop simulation and local ARMHF package checks passed on the Mac. Oasis 3 testing of the battery-powered idle
-timer, sleep and wake, and rotation is pending. [Device notes](docs/device-notes.md)
+Desktop simulation and local ARMHF package checks passed on the Mac.
+On an ARMHF Kindle Oasis 3 running firmware 5.18.2, Focus displayed the custom timer controls, restored the
+original idle preset, and returned to Launcher. Battery-powered idle, sleep and wake, and rotation checks are
+pending. [Device notes](docs/device-notes.md)
 
 ## Develop locally
 
