@@ -33,8 +33,8 @@ minute boundaries to limit e-ink refreshes.
 
 ## Quick start
 
-Copy the `focus` and `documents` folders from the local ARMHF package to your Kindle over USB, then eject and open
-**Focus** from Primitive Launcher. The app uses the fonts installed by Launcher. [Install guide](INSTALL.md)
+After setting up PrimitiveOS, open **Store** from Primitive Launcher. Choose **Focus** under **Apps**,
+tap **Get**, and open it from the Launcher grid. The [install guide](INSTALL.md) also covers local USB testing.
 
 ## Status
 
