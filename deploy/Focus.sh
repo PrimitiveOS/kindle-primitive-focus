@@ -2,9 +2,17 @@
 # Name: Primitive Focus
 # Author: Primitive AI
 # DontUseFBInk
+# PrimitiveUSBLease
 
 app=/mnt/us/focus/bin/focus-kindle
 [ -x "$app" ] || exit 1
+if [ -n "${KL_NATIVE_APP_RUN:-}" ]; then
+    cp "$app" "$KL_NATIVE_APP_RUN/run" && chmod 755 "$KL_NATIVE_APP_RUN/run" || exit 1
+    cd / || exit 1
+    exec "$KL_NATIVE_APP_RUN/run"
+fi
+
+# Older launchers and the stock library start this entry without a shared RAM work directory.
 case "$0" in
     /var/tmp/primitive-focus.*/launch) work=${0%/launch} ;;
     *)
