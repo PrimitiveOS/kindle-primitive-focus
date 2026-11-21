@@ -495,7 +495,7 @@ impl App for View {
             Page::Week => return self.draw_log(canvas, width),
             Page::Timer => {}
         }
-        header(canvas, "Focus", "Done");
+        header(canvas, "Focus", "Exit");
         self.draw_timer(canvas, width);
         canvas.button(
             primary_button(width, self.focus.timer),
